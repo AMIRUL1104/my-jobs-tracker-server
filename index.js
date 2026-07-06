@@ -31,21 +31,47 @@ const mongoURI = process.env.MONGO_URI;
 const client = new MongoClient(mongoURI);
 let db, usersCollection, jobsCollection;
 
-async function connectDB() {
-  try {
+// এই ফাংশনটি প্রতিটা রিকোয়েস্টে কল হবে এবং কানেকশন রি-ইউজ করবে
+async function ensureDB() {
+  if (!db || !usersCollection || !jobsCollection) {
     await client.connect();
-    // Database Name setup
     db = client.db("jobTrackerDB");
     usersCollection = db.collection("users");
     jobsCollection = db.collection("jobs");
-    console.log(
-      "🎯 MongoDB Connected Successfully to jobTrackerDB (Native Driver)",
-    );
-  } catch (err) {
-    console.error("❌ MongoDB Connection Error:", err);
+    console.log("🎯 MongoDB Connected On-Demand");
   }
 }
-connectDB();
+
+// ==========================================
+// DB CONNECTION MIDDLEWARE (রিকোয়েস্ট আসার সাথে সাথে কানেকশন নিশ্চিত করবে)
+// ==========================================
+app.use(async (req, res, next) => {
+  try {
+    await ensureDB();
+    next();
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: "Database connection failed in serverless execution",
+      error: err.message,
+    });
+  }
+});
+
+//   try {
+//     await client.connect();
+//     // Database Name setup
+//     db = client.db("jobTrackerDB");
+//     usersCollection = db.collection("users");
+//     jobsCollection = db.collection("jobs");
+//     console.log(
+//       "🎯 MongoDB Connected Successfully to jobTrackerDB (Native Driver)",
+//     );
+//   } catch (err) {
+//     console.error("❌ MongoDB Connection Error:", err);
+//   }
+// }
+// connectDB();
 
 // Enums manually validated during requests
 const ALLOWED_STATUS = [
@@ -234,12 +260,10 @@ app.post("/jobs", async (req, res) => {
 
     // Manual validation checks for required keys
     if (!companyName || !jobTitle || !appliedDate || !status || !jobType) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Please provide all required fields",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Please provide all required fields",
+      });
     }
 
     // Enum Validations
@@ -257,12 +281,10 @@ app.post("/jobs", async (req, res) => {
     // Fetch the existing admin user to associate with createdBy
     const adminUser = await usersCollection.findOne({ role: "admin" });
     if (!adminUser) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Admin user must exist before creating jobs",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Admin user must exist before creating jobs",
+      });
     }
 
     const newJob = {
@@ -285,13 +307,11 @@ app.post("/jobs", async (req, res) => {
     const result = await jobsCollection.insertOne(newJob);
     const createdJob = await jobsCollection.findOne({ _id: result.insertedId });
 
-    return res
-      .status(201)
-      .json({
-        success: true,
-        message: "Job tracking entry created successfully",
-        data: createdJob,
-      });
+    return res.status(201).json({
+      success: true,
+      message: "Job tracking entry created successfully",
+      data: createdJob,
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -341,21 +361,17 @@ app.patch("/jobs/:id", async (req, res) => {
     );
 
     if (!result) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "Job application parameters not found",
-        });
+      return res.status(404).json({
+        success: false,
+        message: "Job application parameters not found",
+      });
     }
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Job updated successfully",
-        data: result,
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Job updated successfully",
+      data: result,
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -381,12 +397,10 @@ app.delete("/jobs/:id", async (req, res) => {
         .json({ success: false, message: "Target job document not found" });
     }
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Job application tracker deleted successfully",
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Job application tracker deleted successfully",
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
