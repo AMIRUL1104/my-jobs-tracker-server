@@ -58,21 +58,6 @@ app.use(async (req, res, next) => {
   }
 });
 
-//   try {
-//     await client.connect();
-//     // Database Name setup
-//     db = client.db("jobTrackerDB");
-//     usersCollection = db.collection("users");
-//     jobsCollection = db.collection("jobs");
-//     console.log(
-//       "🎯 MongoDB Connected Successfully to jobTrackerDB (Native Driver)",
-//     );
-//   } catch (err) {
-//     console.error("❌ MongoDB Connection Error:", err);
-//   }
-// }
-// connectDB();
-
 // Enums manually validated during requests
 const ALLOWED_STATUS = [
   "Wishlist",
@@ -418,9 +403,9 @@ app.get("/dashboard/stats", async (req, res) => {
   try {
     const jobs = await jobsCollection.find({}).toArray();
 
-    // Calculate counts dynamically via filter array scopes
+    // ১. stats অবজেক্ট তৈরি (আপনার দেওয়া হুবহু ফরম্যাটে)
     const stats = {
-      totalApplications: jobs.length,
+      total: jobs.length,
       wishlist: jobs.filter((j) => j.status === "Wishlist").length,
       applied: jobs.filter((j) => j.status === "Applied").length,
       underReview: jobs.filter((j) => j.status === "Under Review").length,
@@ -435,7 +420,22 @@ app.get("/dashboard/stats", async (req, res) => {
       ghosted: jobs.filter((j) => j.status === "Ghosted").length,
     };
 
-    return res.status(200).json({ success: true, data: stats });
+    // ২. chartData অ্যারে তৈরি (আপনার দেওয়া কাস্টম নাম ও কাউন্ট অনুযায়ী)
+    const chartData = [
+      { status: "Wishlist", count: stats.wishlist },
+      { status: "Applied", count: stats.applied },
+      { status: "Review", count: stats.underReview },
+      { status: "Interview", count: stats.interview },
+      { status: "Offer", count: stats.offerReceived },
+      { status: "Rejected", count: stats.rejected },
+    ];
+
+    // ৩. আপনার কাঙ্ক্ষিত ফরম্যাটে রেসপন্স পাঠানো
+    return res.status(200).json({
+      success: true,
+      stats,
+      chartData,
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
